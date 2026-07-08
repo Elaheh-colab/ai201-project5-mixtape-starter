@@ -16,6 +16,21 @@ During this project, I utilized an AI assistant as an interactive documentation 
 **Verification and AI Limitations:** While the AI was excellent at explaining syntax and answering targeted questions, I could not rely on it for the actual diagnosis. If asked to find a bug without context, it would guess incorrectly. My workflow required me to manually reproduce the bugs locally, trace the execution to find the exact file and function, and only then use the AI to clarify the specific logic I was looking at. Furthermore, I manually verified all of the AI's suggestions by checking the surrounding logic (e.g., ensuring the `timedelta` removal in Issue #2 didn't break the `get_activity_feed` function) before implementing any fixes.
 
 ## Codebase Map
+
+### Main Files & Responsibilities
+* **`models.py`:** Defines the core SQLAlchemy database schema (`User`, `Song`, `Playlist`, `ListeningEvent`, etc.). Notably, it utilizes association tables for complex relationships, such as `playlist_entries`, which explicitly tracks a song's `position` in a playlist using an integer rather than relying on insertion order.
+* **`routes/users.py`:** Handles incoming HTTP requests for user-related endpoints. It strictly focuses on extracting request parameters, delegating logic to the service layer, and formatting JSON responses.
+* **`services/streak_service.py`:** Contains the business logic for calculating user listening streaks. It evaluates date deltas to determine whether a streak should increment, remain unchanged, or reset to 1.
+
+### Data Flow Trace: Updating a Listening Streak
+When a user listens to a song, the system executes `record_listening_event(user_id, song_id)` inside `services/streak_service.py`. This initiates a two-step flow:
+1. A new `ListeningEvent` record is committed to the database with the current UTC timestamp.
+2. The service immediately calls `update_listening_streak()`, which calculates the `days_since_last` listen by comparing today's date against the user's `last_listened_at` timestamp. Based on this delta, the user's `listening_streak` attribute is mutated on the `User` model.
+
+### Architectural Pattern Notice
+The application strictly adheres to a separation of concerns pattern. The route files (like `routes/users.py`) act purely as traffic controllers doing input parsing and response formatting. Every route delegates immediately to a service function. All actual business logic and database manipulations live exclusively in the `services/` layer.
+
+
 ### Issue #1 — My listening streak keeps resetting
 
 * **How I reproduced it:** I opened the database using a Flask shell and manually set a test user's `last_listened_at` timestamp to a Saturday, and their `listening_streak` to 12. I then changed my system clock to Sunday and triggered a new listening event for that user. I verified via `GET /users/<id>/streak` that the streak reset to 1 instead of incrementing to 13.
@@ -51,15 +66,3 @@ During this project, I utilized an AI assistant as an interactive documentation 
 * **The root cause:** The database query was working correctly, but the function's return statement was written as `[song.to_dict() for song in songs[:-1]]`. In Python, the `[:-1]` slice syntax returns a new list containing all elements except the very last one. This hardcoded slice actively truncated the final song from the array right before the data was formatted and sent back to the user.
 * **My fix and side-effect check:** I removed the `[:-1]` slice from the list comprehension so it reads `for song in songs`. To verify the fix, I added a new song and checked the response payload to ensure the returned array length now perfectly matches the actual number of songs associated with the playlist in the database, with the newest song correctly displayed at the end.
 
-### Main Files & Responsibilities
-* **`models.py`:** Defines the core SQLAlchemy database schema (`User`, `Song`, `Playlist`, `ListeningEvent`, etc.). Notably, it utilizes association tables for complex relationships, such as `playlist_entries`, which explicitly tracks a song's `position` in a playlist using an integer rather than relying on insertion order.
-* **`routes/users.py`:** Handles incoming HTTP requests for user-related endpoints. It strictly focuses on extracting request parameters, delegating logic to the service layer, and formatting JSON responses.
-* **`services/streak_service.py`:** Contains the business logic for calculating user listening streaks. It evaluates date deltas to determine whether a streak should increment, remain unchanged, or reset to 1.
-
-### Data Flow Trace: Updating a Listening Streak
-When a user listens to a song, the system executes `record_listening_event(user_id, song_id)` inside `services/streak_service.py`. This initiates a two-step flow:
-1. A new `ListeningEvent` record is committed to the database with the current UTC timestamp.
-2. The service immediately calls `update_listening_streak()`, which calculates the `days_since_last` listen by comparing today's date against the user's `last_listened_at` timestamp. Based on this delta, the user's `listening_streak` attribute is mutated on the `User` model.
-
-### Architectural Pattern Notice
-The application strictly adheres to a separation of concerns pattern. The route files (like `routes/users.py`) act purely as traffic controllers doing input parsing and response formatting. Every route delegates immediately to a service function. All actual business logic and database manipulations live exclusively in the `services/` layer.
