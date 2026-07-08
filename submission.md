@@ -16,6 +16,13 @@
 * **The root cause:** The `cutoff` time for the database query was calculated as `datetime.now(timezone.utc) - timedelta(hours=24)`. This created a rolling 24-hour window rather than a strict "today" filter. Because of this, any song played late the previous evening would mathematically remain inside the 24-hour threshold throughout the following morning, persisting in the feed until exactly 24 hours had passed.
 * **My fix and side-effect check:** I removed the `timedelta` subtraction. Instead, I grabbed the current UTC time and used the `.replace(hour=0, minute=0, second=0, microsecond=0)` method to set the `cutoff` precisely to midnight of the current calendar day. To check for side effects, I reviewed the other function in the file (`get_activity_feed`). I confirmed it uses a static limit (`.limit(limit)`) rather than time-based filtering, meaning my changes to the time logic safely isolated the fix to the "Listening Now" feature.
 
+### Issue #3 — The same song keeps showing up twice in search
+
+* **How I reproduced it:** I opened my browser and navigated to `http://127.0.0.1:5000/songs/search?q=Anthem`. I observed the returned JSON payload and confirmed that "Crown Heights Anthem" was returned three separate times in the array. 
+* **How I found the root cause:** I traced the request from `routes/songs.py` to the `search_songs` function in `services/search_service.py`. I looked at the SQLAlchemy query and noticed an explicit `.outerjoin` on the `song_tags` association table. Knowing how SQL joins operate, I realized that joining a many-to-many relationship without aggregating or using a distinct clause creates a Cartesian product, multiplying the rows by the number of tags a song has.
+* **The root cause:** The query explicitly performed an `.outerjoin` on `song_tags`, but lacked a `.distinct()` clause. When a song (like "Crown Heights Anthem") had multiple tags, the SQL join produced a separate row for each tag. Since the query did not deduplicate these rows, SQLAlchemy returned a list containing duplicate `Song` objects for any multi-tagged song matching the search.
+* **My fix and side-effect check:** I removed the `.outerjoin(song_tags...)` line completely. The join was unnecessary because the `.filter()` condition only searched against `title` and `artist`, not tags. To ensure I didn't break related functionality, I verified the JSON response still accurately included the array of tags for each song. Because `models.py` configures the `tags` relationship with `lazy="subquery"`, the tags serialize perfectly via `song.to_dict()` without needing the manual join in the search query.
+
 
 
 ### Main Files & Responsibilities
