@@ -1,5 +1,21 @@
 # Mixtape Bug Hunt Submission
 **Author:** Elaheh Baharlouei
+# Mixtape Bug Hunt Submission
+**Author:** Elaheh Baharlouei
+
+## AI Usage Statement
+
+During this project, I utilized an AI assistant as an interactive documentation tool and a sounding board to help navigate the unfamiliar codebase. 
+
+**Codebase Orientation:** I used the AI to help generate high-level file summaries and trace data flows. By providing files like `models.py` and `routes/users.py`, I asked the AI to summarize their core responsibilities. This quickly highlighted the strict separation of concerns between the route and service layers and helped me structure my Codebase Map.
+
+**Bug Investigation & Code Explanation:** I used the AI selectively to explain specific syntax quirks and database behaviors once I had manually narrowed down the suspicious code:
+* For **Issue #1**, after locating the streak update logic, I asked the AI to confirm the edge cases for Python's `datetime.weekday()` to verify my hypothesis that `6` represents Sunday.
+* For **Issue #3**, I asked the AI to explain the exact behavior of SQLAlchemy's `.outerjoin()` on a many-to-many relationship. It explained the concept of a Cartesian product, which clarified why the database was returning duplicate rows.
+* For **Issue #4**, I provided both `playlist_service.py` and `notification_service.py` and asked the AI to compare the structural differences between the working playlist function and the broken rating function to help spot the missing architectural step.
+* For **Issue #5**, after isolating the bug to the playlist retrieval function's return statement, I asked the AI to clarify the exact behavior of the `[:-1]` Python list slice to confirm my suspicion that it was intentionally dropping the final element from the array.
+
+**Verification and AI Limitations:** While the AI was excellent at explaining syntax and answering targeted questions, I could not rely on it for the actual diagnosis. If asked to find a bug without context, it would guess incorrectly. My workflow required me to manually reproduce the bugs locally, trace the execution to find the exact file and function, and only then use the AI to clarify the specific logic I was looking at. Furthermore, I manually verified all of the AI's suggestions by checking the surrounding logic (e.g., ensuring the `timedelta` removal in Issue #2 didn't break the `get_activity_feed` function) before implementing any fixes.
 
 ## Codebase Map
 ### Issue #1 — My listening streak keeps resetting
