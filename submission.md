@@ -1,7 +1,5 @@
 # Mixtape Bug Hunt Submission
 **Author:** Elaheh Baharlouei
-# Mixtape Bug Hunt Submission
-**Author:** Elaheh Baharlouei
 
 ## AI Usage Statement
 
